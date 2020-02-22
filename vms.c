@@ -12,8 +12,8 @@ struct Access{
 	
 //Prototype functions
 void loadBitString(char input[], struct Access* access);
+char* decimalToBinary(int input);
 void loadAccesses(char input[]);
-
 //personal debug functions
 void printAccessBitString(struct Access* access);
 
@@ -24,11 +24,35 @@ int main(int argc, char* argv[]){
 	loadAccesses(argv[1]);
 	char input[] = "190aff38"; //created a test address
 	struct Access* access = malloc(sizeof(struct Access)); //create and allocate memory for access
-	loadBitString(input, access); //convert hexidecimal address into binary
+	//loadBitString(input, access); //convert hexidecimal address into binary
 	printAccessBitString(access); //print access' bit string
 	return 0;
 }
 
+char* decimalToBinary(int input){
+   int c, d, count;
+   char *output;
+   
+   count = 0;
+   output = (char*) malloc(32 + 1);
+   
+   if (output == NULL)
+      exit(1);
+     
+   for (c = 31; c >= 0; c--){
+      d = input >> c;
+     
+      if (d & 1){
+         *(output + count) = 1 + '0';
+      } else{
+         *(output + count) = 0 + '0';
+	  }
+      count++;
+   }
+   *(output + count) = '\0';
+   
+   return  output;
+}
 void loadBitString(char input[], struct Access* access){
 	int i = 0;
 	printf("%s\n", input);
@@ -153,10 +177,11 @@ void loadAccesses(char input[]){
 	}
 	int lines = 0;
 	while(!feof(file)){
-		char addr[8];
+		int addr;
 		char rw;
-		fscanf(file,"%x %c", &addr,&rw);	
-		printf("%x %c\n", addr, rw);
+		fscanf(file,"%x %c", &addr,&rw);
+		if (lines ==0)
+		printf("%s %c\n", decimalToBinary(addr), rw);
 		lines++;
 	}
 	printf("Lines: %d\n", lines);

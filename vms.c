@@ -12,18 +12,20 @@ struct Access{
 	
 //Prototype functions
 void loadBitString(char input[], struct Access* access);
-
+void loadAccesses(char* file);
 
 //personal debug functions
 void printAccessBitString(struct Access* access);
 
 
-int main(){
+int main(char traceFile[], int frames, char alg[], char mode[]){
+
+	loadAccesses(traceFile);
 	
-	char input[] = "190aff38";
-	struct Access* access = malloc(sizeof(struct Access));
-	loadBitString(input, access);
-	printAccessBitString(access);
+	char input[] = "190aff38"; //created a test address
+	struct Access* access = malloc(sizeof(struct Access)); //create and allocate memory for access
+	loadBitString(input, access); //convert hexidecimal address into binary
+	printAccessBitString(access); //print access' bit string
 	return 0;
 }
 
@@ -141,6 +143,21 @@ void loadBitString(char input[], struct Access* access){
 				access->bitString[i * 4] 	 = -1;		
 		}	
 	}
+}
+void loadAccesses(char* input){
+	FILE* file;
+	file = fopen(input, "r");
+	printf("%s", *input);
+	if (file == NULL){
+		printf("Error opening file.\n");
+		exit(1);
+	}
+	//while(){
+		char addr[8];
+		char rw;
+		fscanf(file,"%x %c",&addr,&rw);	
+		printf("%x %c\n", addr, rw);
+	//}
 }
 
 //personal debug functions

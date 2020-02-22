@@ -12,14 +12,15 @@ struct Access{
 	
 //Prototype functions
 void loadBitString(char input[], struct Access* access);
-void loadAccesses(char file[]);
+void loadAccesses(char input[]);
 
 //personal debug functions
 void printAccessBitString(struct Access* access);
 
 
 int main(int argc, char* argv[]){
-
+	
+	
 	loadAccesses(argv[1]);
 	char input[] = "190aff38"; //created a test address
 	struct Access* access = malloc(sizeof(struct Access)); //create and allocate memory for access
@@ -146,17 +147,19 @@ void loadBitString(char input[], struct Access* access){
 void loadAccesses(char input[]){
 	FILE* file;
 	file = fopen(input, "r");
-	printf("%s", *input);
 	if (file == NULL){
 		printf("Error opening file.\n");
 		exit(1);
 	}
-	//while(){
+	int lines = 0;
+	while(!feof(file)){
 		char addr[8];
 		char rw;
-		fscanf(file,"%x %c",&addr,&rw);	
+		fscanf(file,"%x %c", &addr,&rw);	
 		printf("%x %c\n", addr, rw);
-	//}
+		lines++;
+	}
+	printf("Lines: %d\n", lines);
 }
 
 //personal debug functions

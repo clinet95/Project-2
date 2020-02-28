@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 //An access is every line item in the trace file.
 //It is basically the memory address being requested as well as the type of memory access it is. Read/Write
@@ -12,11 +13,25 @@ struct Access{
 	struct Access* nextAccess;
 	};
 	
+//GLOBAL VARIABLES
+int numOfFrames;
+int* RAM;
+char replacementMethod;
+int debugMode;	
+	
 //Prototype functions
 void loadBitString(char input[], struct Access* access);
 char* decimalToBinary(int input);
 void loadAccesses(char input[], struct Access* a);
 int* stringToIntArray(char input[], int size);
+int getPageNum(struct Access* a);
+void initializeSimulator(char frames[], char mode[], char debug[]);
+void simulate(struct Access* accessHead);
+
+//page replacement policies here
+int randomPageRemoval();//returns an integer which will be the index of the page's location in RAM
+
+
 //personal debug functions
 void printAccessBitString(struct Access* access);
 void printAccesses(struct Access* access); //prints provides access bitstring as well as the accesses linked
@@ -27,10 +42,22 @@ int main(int argc, char* argv[]){
 	struct Access* accessHead = malloc(sizeof(struct Access)); //create and allocate memory for access
 
 	loadAccesses(argv[1], accessHead); //reads in every trace from trace file and creates structs for them. Then, creates a linked list out of them
-	printAccesses(accessHead); //prints all accesses starting from the head
+	initializeSimulator(argv[2], argv[3], argv[4]);
+	simulate(accessHead);
+	
+	//put debug stuff here
+	if (debugMode){
+		/*
+		printAccessBitString(accessHead);
+		printf("%d\n", getPageNum(accessHead));
+		printf("Debug Mode Selected.\n");
+		printf("The page replacement method selected is: %c\n", replacementMethod);
+		*/
+	}
 
 	return 0;
 }
+
 
 //converts decimal to binary
 char* decimalToBinary(int input){
@@ -173,6 +200,7 @@ void loadBitString(char input[], struct Access* access){
 	}
 }
 void loadAccesses(char input[], struct Access* a){
+
 	FILE* file;
 	file = fopen(input, "r");
 	if (file == NULL){
@@ -208,6 +236,129 @@ void loadAccesses(char input[], struct Access* a){
 		}
 		lines++;
 	}
+}
+int getPageNum(struct Access* a){
+	int i, sum, j, bit, pow;
+	bit = 19;
+	sum = 0;//initialize
+	// loop through the first 20msb of  access and convert each bit into it's decimalrepresentation
+	//Then, add it to the sum
+	for(i = 0; i < 20; i++){ 
+		pow = 1;
+		//calculate 2 to the power of i
+			for (j = 0; j < bit; j++){
+				pow *= 2;
+			}
+			sum += a->bitString[i] * pow;
+			bit--;
+	}
+	return sum;
+}
+void initializeSimulator(char frames[], char mode[], char debug[]){
+	//allocate array used to act as RAM
+	numOfFrames = atoi(frames);
+	RAM = (int*)malloc(numOfFrames * sizeof(int));
+	
+	//Fill RAM with -1 to know when RAM is full or not
+	int i;
+	for(i = 0; i < numOfFrames; i++){
+		RAM[i] = -1;
+	}
+	
+	//set replacementMethod.
+	//f = FIFO, r = random, v = vms, lru = l;
+	if(strcmp(mode, "rdm") == 0){
+		replacementMethod = 'r';
+	} else if (strcmp(mode, "lru") == 0){
+		replacementMethod = 'l';
+	} else if (strcmp(mode, "fifo") == 0){
+		replacementMethod = 'f';
+	} else if (strcmp(mode, "vms") == 0){
+		replacementMethod = 'v';
+	} else {
+		printf("Invalid replacement method specified.\n");
+	}
+	
+	//set debugMode
+	//1 = debug mode on,  0 = debug mode off
+	if(strcmp(debug, "debug") == 0){
+		debugMode = 1;
+	} else {
+		debugMode = 0;
+	}
+}
+
+void simulate(struct Access* accessHead){
+
+	int RAMHits = 0, RAMMisses = 0; 
+	struct Access* trace = malloc(sizeof(struct Access*));
+	trace = accessHead;
+	
+	//loop through every trace loaded
+	while(trace->nextAccess != NULL){
+		
+		int i;
+		int pageFound = 0;
+		//iterate through RAM trying to find current trace's page
+		for(i = 0; i < numOfFrames; i++){
+			if(RAM[i] == getPageNum(trace)){
+				pageFound = 1;
+			}
+		}
+		
+		if(pageFound){ // current trace's page was found on RAM
+			RAMHits++;
+		} else { //current trace's page was not found on RAM
+			RAMMisses++;
+			
+			//try to find empty frame
+			int emptyFrameFound = 0;
+			for(i = 0; i < numOfFrames; i++){
+				if(RAM[i] == -1){ //check if there is an empty frame in RAM
+					RAM[i] = getPageNum(trace); //add current trace's page to RAM
+					emptyFrameFound = 1; //set the flag saying that an empty frame was found(no page fault necessary)
+					break;
+				}
+			}
+			
+			
+			//if there was no empty frame found
+			if(!emptyFrameFound){
+				//remove frame
+				switch(replacementMethod){
+					case 'r':
+						printf("Removing random page\n");
+						break;
+					case 'f':
+
+						break;
+					case 'l':
+					
+						break;
+					case'v':
+					
+						break;
+					default: //invalid page replacement method
+						printf("Page fault detected. No valid page replacement method was input. Program terminating.\n");
+						exit(1);
+				}
+			}
+			
+		}
+		
+		
+		
+		
+		trace = trace->nextAccess;//increment tonext trace
+	}
+	
+	if(debugMode){
+		printf("Value stored inside first address of RAM: %d\n", RAM[1]);
+		printf("RAM Hits:\t%d\n", RAMHits);
+		printf("RAM Misses:\t%d\n", RAMMisses);
+	}
+	 
+	
 }
 
 //personal debug functions

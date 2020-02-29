@@ -8,17 +8,27 @@
 //It is basically the memory address being requested as well as the type of memory access it is. Read/Write
 struct Access{
 	int bitString[32];
+	int ramIndex;
+	int hexVal;
+	int isDirty;
 	char type;
 	struct Access* nextAccess;
 	};
 	
+struct fifoQueue{
+	int key;
+	struct Access* front,* end;
+};	
 //GLOBAL VARIABLES
 int numOfFrames;
 int* RAM;
 char replacementMethod;
 int debugMode;
 int fifoIndex;
-
+struct fifoQueue* fifoQueue;
+int eventsInTrace;
+int diskReads;
+int diskWrites;
 	
 //Prototype functions
 void loadBitString(char input[], struct Access* access);
@@ -28,7 +38,8 @@ int* stringToIntArray(char input[], int size);
 int getPageNum(struct Access* a);
 void initializeSimulator(char frames[], char mode[], char debug[]);
 void simulate(struct Access* accessHead);
-void insertPage(int pageNum, int frameNum);
+void insertPage(int pageNum, int frameNum, struct Access* trace);
+struct Access* getAccess(int frameNum, struct Access* accessHead);
 
 //page replacement policies here
 int randomPageRemoval();//returns an integer which will be the index of the page's location in RAM
@@ -47,14 +58,14 @@ int main(int argc, char* argv[]){
 	loadAccesses(argv[1], accessHead); //reads in every trace from trace file and creates structs for them. Then, creates a linked list out of them
 	simulate(accessHead);
 	
+	
+	printf("\nTotal memory frames: %d\n", numOfFrames);
+	printf("Events in trace: %d\n", eventsInTrace);
+	printf("Total disk reads: %d\n", diskReads);
+	printf("Total disk writes: %d\n", diskWrites);
 	//put debug stuff here
 	if (debugMode){
-		/*
-		printAccessBitString(accessHead);
-		printf("%d\n", getPageNum(accessHead));
-		printf("Debug Mode Selected.\n");
-		printf("The page replacement method selected is: %c\n", replacementMethod);
-		*/
+
 	}
 
 	return 0;
@@ -203,7 +214,6 @@ void loadBitString(char input[], struct Access* access){
 }
 void loadAccesses(char input[], struct Access* a){
 	
-	
 	FILE* file;
 	file = fopen(input, "r");
 	if (file == NULL){
@@ -219,12 +229,16 @@ void loadAccesses(char input[], struct Access* a){
 		char rw;
 		fscanf(file,"%x %c", &addr,&rw);
 		if (lines ==0){ //create head node
+			eventsInTrace = -1;
 			int i = 0;
 			for(i; i < 32; i++){
 				a->bitString[i] = decimalToBinary(addr)[i] - '0'; //convert each char value into decimal and store in headAccess
 			}
+			a->isDirty = 0;
+			a->hexVal = addr;
 			a->nextAccess = NULL;
 			a->type = rw;
+			a->ramIndex = -1;
 			prevAccess = a;
 		} else { //adding additional nodes
 			struct Access* access = malloc(sizeof(struct Access)); //create and allocate memory for access
@@ -234,10 +248,14 @@ void loadAccesses(char input[], struct Access* a){
 			}
 			prevAccess->nextAccess = access; //set  previous node's "nextaccess" value to current
 			access->nextAccess = NULL;
+			a->isDirty = 0;
+			access->hexVal = addr;
 			access->type = rw;
+			access->ramIndex = -1;
 			prevAccess  = access; //now that this node is done, set it as previous so that the next iteration can reference it
 		}
 		lines++;
+		eventsInTrace++;
 	}
 	
 	if(debugMode){
@@ -262,10 +280,18 @@ int getPageNum(struct Access* a){
 	return sum;
 }
 void initializeSimulator(char frames[], char mode[], char debug[]){
+	//initialize global variables
+	eventsInTrace = 0;
+	diskReads = 0;
+	diskWrites = 0;
+	
 	//allocate array used to act as RAM
 	numOfFrames = atoi(frames);
 	RAM = (int*)malloc(numOfFrames * sizeof(int));
-
+	
+	//initialze fifo queue
+	fifoQueue = (struct fifoQueue*)malloc(sizeof(struct fifoQueue)); 
+    fifoQueue->front = fifoQueue->end = NULL; 
 	
 	//Fill RAM with -1 to know when RAM is full or not
 	int i;
@@ -305,15 +331,26 @@ void initializeSimulator(char frames[], char mode[], char debug[]){
 void simulate(struct Access* accessHead){
 
 	if (debugMode){
-		printf("Begginning simulation.\n");
+		printf("Begginning simulation.\n\n");
 	}
 	int RAMHits = 0, RAMMisses = 0; 
 	struct Access* trace = malloc(sizeof(struct Access*));
 	trace = accessHead;
+	
+	/*trace->ramIndex = accessHead->ramIndex;
+	trace->type = accessHead->type;
+	trace->hexVal = accessHead->hexVal;
+	trace->isDirty = accessHead->isDirty;
+	int i;
+	for(i = 0; i < 32; i++){
+		trace->bitString[i] = accessHead->bitString[i];
+	}
+	*/
 	int tick = 0;
 	//loop through every trace loaded
 	while(trace->nextAccess != NULL){
 		tick++;
+		
 		if(debugMode){
 			//if(tick % 1000 == 0)
 				//printf("%d\n", tick);
@@ -368,7 +405,7 @@ void simulate(struct Access* accessHead){
 			int emptyFrameFound = 0;
 			for(i = 0; i < numOfFrames; i++){
 				if(RAM[i] == -1){ //check if there is an empty frame in RAM
-					insertPage(getPageNum(trace), i); //add current trace's page to RAM
+					insertPage(getPageNum(trace), i, trace); //add current trace's page to RAM
 					emptyFrameFound = 1; //set the flag saying that an empty frame was found(no page fault necessary)
 					break;
 				}
@@ -382,11 +419,23 @@ void simulate(struct Access* accessHead){
 				switch(replacementMethod){
 					case 'r':
 						newFrame = randomPageRemoval(); //generate frame to place trace in
-						insertPage(getPageNum(trace), newFrame); //place page in frame
+						//printf("Trying to removeframe: %d\n", newFrame);
+						//check if frame about to be removed is dirty
+						if(getAccess(newFrame, accessHead)->isDirty){
+							getAccess(newFrame, accessHead)->isDirty = 0;
+							diskWrites += 1;
+						}
+						insertPage(getPageNum(trace), newFrame, trace); //place page in frame
 						break;
 					case 'f':
 						newFrame = fifoPageRemoval();
-						insertPage(getPageNum(trace), newFrame);
+						//check if frame about to be removed is dirty
+						if(getAccess(newFrame, accessHead)->isDirty){
+							getAccess(newFrame, accessHead)->isDirty = 0;
+							diskWrites += 1;
+						}
+						
+						insertPage(getPageNum(trace), newFrame, trace);
 						break;
 					case 'l':
 					
@@ -405,33 +454,78 @@ void simulate(struct Access* accessHead){
 		trace = trace->nextAccess;//increment tonext trace
 	}
 	
+	diskReads = RAMMisses;
 	if(debugMode){
-		printf("Value stored inside first address of RAM: %d\n", RAM[1]);
 		printf("RAM Hits:\t%d\n", RAMHits);
 		printf("RAM Misses:\t%d\n", RAMMisses);
 	}
 	 
 	
 }
-void insertPage(int pageNum, int frameNum){
+void insertPage(int pageNum, int frameNum, struct Access* trace){
 	RAM[frameNum] = pageNum;
+	trace->ramIndex = frameNum;
+	//printf("Trace %x  being put in frame %d\n", trace->hexVal, trace->ramIndex);
+	if(trace->type == 'W'){
+		trace->isDirty = 1;
+	}
+	
+	if(replacementMethod == 'f'){
+		//add trace to fifoqueue
+		struct Access* a = (struct Access*)malloc(sizeof(struct Access));
+		a->ramIndex = trace->ramIndex;
+		a->type = trace->type;
+		a->hexVal = trace->hexVal;
+		a->isDirty = 0;
+		int i;
+		for(i = 0; i < 32; i++){
+			a->bitString[i] = trace->bitString[i];
+		}
+			// If queue is empty, then new node is front and rear both 
+		if (fifoQueue->end == NULL) { 
+			fifoQueue->front = fifoQueue->end = a; 
+		} else {
+			// Add the new node at the end of queue and change rear 
+			fifoQueue->end->nextAccess = a; 
+			fifoQueue->end = a; 
+		}
+	}
+}
+struct Access* getAccess(int frameNum, struct Access* accessHead){
+	
+	struct Access* currAccess = accessHead;
+	while(currAccess->nextAccess  != NULL){
+		if(currAccess->ramIndex == frameNum){
+			return currAccess;
+		}
+		currAccess = currAccess->nextAccess;
+	}
+	struct Access* nullAccess = malloc(sizeof(struct Access*));
+	nullAccess->ramIndex = -1;
+	return nullAccess;
 }
 
 int randomPageRemoval(){
-	return rand() % (numOfFrames + 1);
+	return rand() % (numOfFrames);
 }
-
 int fifoPageRemoval(){
-	if (fifoIndex == -1){ //if firstpage removal or after reset
-		fifoIndex = 0;
-		return fifoIndex;
-	} else if (fifoIndex == numOfFrames - 1){ //if index reaches last spot  in que,reset indee to zero
-		fifoIndex = 0;
-		return fifoIndex;
-	} else {
-		fifoIndex += 1;
-		return fifoIndex;
+	
+	
+	// Store previous front and move front one node ahead 
+    struct Access* temp = fifoQueue->front; 
+  
+    fifoQueue->front = fifoQueue->front->nextAccess; 
+  
+    // If front becomes NULL, then change rear also as NULL 
+    if (fifoQueue->front == NULL) 
+        fifoQueue->end = NULL; 
+	int returnVal = temp->ramIndex;
+	if(debugMode){
+		//printf("Evicting %X from index %d.\n", temp->hexVal, temp->ramIndex);
 	}
+	
+    free(temp); 
+	return returnVal;
 }
 
 
@@ -447,11 +541,19 @@ void printAccessBitString(struct Access* access){
 			access->bitString[24], access->bitString[25], access->bitString[26], access->bitString[27],
 			access->bitString[28], access->bitString[29], access->bitString[30], access->bitString[31]);
 }
-
 void printAccesses(struct Access* access){
+	
+	int i;
+	for(i = 0; i < numOfFrames; i++){
+		printf("%x\n", getAccess(i, access)->hexVal);
+	}
+	/*
 	struct Access* currAccess = access;
 	while(currAccess->nextAccess != NULL){
 		printAccessBitString(currAccess);
 		currAccess = currAccess->nextAccess;
 	}
+	 * */
 }
+
+

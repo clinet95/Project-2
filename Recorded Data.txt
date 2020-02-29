@@ -1,0 +1,18 @@
+//100 frames
+testing gcc.trace for random:
+disk reads: 59,228
+disk writes: 42
+
+testing gcc.trace for fifo:
+disk reads: 54,194
+disk writes: 42
+
+
+//500 frames
+testing gcc.trace for random:
+disk reads: 15,584
+disk writes: 424
+
+testing gcc.trace for fifo:
+disk reads: 16,001
+disk writes: 424

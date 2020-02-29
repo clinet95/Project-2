@@ -1,5 +1,4 @@
 // vms stands for Virtual Memory System
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,7 +16,9 @@ struct Access{
 int numOfFrames;
 int* RAM;
 char replacementMethod;
-int debugMode;	
+int debugMode;
+int fifoIndex;
+
 	
 //Prototype functions
 void loadBitString(char input[], struct Access* access);
@@ -27,10 +28,11 @@ int* stringToIntArray(char input[], int size);
 int getPageNum(struct Access* a);
 void initializeSimulator(char frames[], char mode[], char debug[]);
 void simulate(struct Access* accessHead);
+void insertPage(int pageNum, int frameNum);
 
 //page replacement policies here
 int randomPageRemoval();//returns an integer which will be the index of the page's location in RAM
-
+int fifoPageRemoval(); //returns an integer which will be the index of the page's location in RAM
 
 //personal debug functions
 void printAccessBitString(struct Access* access);
@@ -40,9 +42,9 @@ void printAccesses(struct Access* access); //prints provides access bitstring as
 int main(int argc, char* argv[]){
 	
 	struct Access* accessHead = malloc(sizeof(struct Access)); //create and allocate memory for access
-
-	loadAccesses(argv[1], accessHead); //reads in every trace from trace file and creates structs for them. Then, creates a linked list out of them
+	
 	initializeSimulator(argv[2], argv[3], argv[4]);
+	loadAccesses(argv[1], accessHead); //reads in every trace from trace file and creates structs for them. Then, creates a linked list out of them
 	simulate(accessHead);
 	
 	//put debug stuff here
@@ -200,7 +202,8 @@ void loadBitString(char input[], struct Access* access){
 	}
 }
 void loadAccesses(char input[], struct Access* a){
-
+	
+	
 	FILE* file;
 	file = fopen(input, "r");
 	if (file == NULL){
@@ -236,6 +239,10 @@ void loadAccesses(char input[], struct Access* a){
 		}
 		lines++;
 	}
+	
+	if(debugMode){
+		printf("Successfully loaded accesses from trace file.\n");
+	}
 }
 int getPageNum(struct Access* a){
 	int i, sum, j, bit, pow;
@@ -258,6 +265,7 @@ void initializeSimulator(char frames[], char mode[], char debug[]){
 	//allocate array used to act as RAM
 	numOfFrames = atoi(frames);
 	RAM = (int*)malloc(numOfFrames * sizeof(int));
+
 	
 	//Fill RAM with -1 to know when RAM is full or not
 	int i;
@@ -276,7 +284,8 @@ void initializeSimulator(char frames[], char mode[], char debug[]){
 	} else if (strcmp(mode, "vms") == 0){
 		replacementMethod = 'v';
 	} else {
-		printf("Invalid replacement method specified.\n");
+		printf("Page fault detected. No valid page replacement method was input. Program terminating.\n");
+		exit(1);
 	}
 	
 	//set debugMode
@@ -286,17 +295,61 @@ void initializeSimulator(char frames[], char mode[], char debug[]){
 	} else {
 		debugMode = 0;
 	}
+	
+	if(debugMode){
+		printf("Initializing main memory.\n");
+		printf("Successfully allocated %d frames in memory.\n", numOfFrames);
+		printf("Page replacement method: %s\n", mode);
+	}
 }
-
 void simulate(struct Access* accessHead){
 
+	if (debugMode){
+		printf("Begginning simulation.\n");
+	}
 	int RAMHits = 0, RAMMisses = 0; 
 	struct Access* trace = malloc(sizeof(struct Access*));
 	trace = accessHead;
-	
+	int tick = 0;
 	//loop through every trace loaded
 	while(trace->nextAccess != NULL){
-		
+		tick++;
+		if(debugMode){
+			//if(tick % 1000 == 0)
+				//printf("%d\n", tick);
+			switch (tick){
+			case 100000:
+					printf("10%%\n");
+				break;
+			case 200000:
+					printf("20%%\n");
+				break;
+			case 300000:
+					printf("30%%\n");
+				break;
+			case 400000:
+					printf("40%%\n");
+				break;
+			case 500000:
+					printf("50%%\n");
+				break;
+			case 600000:
+					printf("60%%\n");
+				break;
+			case 700000:
+					printf("70%%\n");
+				break;
+			case 800000:
+					printf("80%%\n");
+				break;
+			case 900000:
+					printf("90%%\n");
+				break;
+			case 1000000:
+					printf("100%%\n");
+				break;
+			}
+		}
 		int i;
 		int pageFound = 0;
 		//iterate through RAM trying to find current trace's page
@@ -315,7 +368,7 @@ void simulate(struct Access* accessHead){
 			int emptyFrameFound = 0;
 			for(i = 0; i < numOfFrames; i++){
 				if(RAM[i] == -1){ //check if there is an empty frame in RAM
-					RAM[i] = getPageNum(trace); //add current trace's page to RAM
+					insertPage(getPageNum(trace), i); //add current trace's page to RAM
 					emptyFrameFound = 1; //set the flag saying that an empty frame was found(no page fault necessary)
 					break;
 				}
@@ -324,13 +377,16 @@ void simulate(struct Access* accessHead){
 			
 			//if there was no empty frame found
 			if(!emptyFrameFound){
+				int newFrame;
 				//remove frame
 				switch(replacementMethod){
 					case 'r':
-						printf("Removing random page\n");
+						newFrame = randomPageRemoval(); //generate frame to place trace in
+						insertPage(getPageNum(trace), newFrame); //place page in frame
 						break;
 					case 'f':
-
+						newFrame = fifoPageRemoval();
+						insertPage(getPageNum(trace), newFrame);
 						break;
 					case 'l':
 					
@@ -338,9 +394,6 @@ void simulate(struct Access* accessHead){
 					case'v':
 					
 						break;
-					default: //invalid page replacement method
-						printf("Page fault detected. No valid page replacement method was input. Program terminating.\n");
-						exit(1);
 				}
 			}
 			
@@ -360,6 +413,27 @@ void simulate(struct Access* accessHead){
 	 
 	
 }
+void insertPage(int pageNum, int frameNum){
+	RAM[frameNum] = pageNum;
+}
+
+int randomPageRemoval(){
+	return rand() % (numOfFrames + 1);
+}
+
+int fifoPageRemoval(){
+	if (fifoIndex == -1){ //if firstpage removal or after reset
+		fifoIndex = 0;
+		return fifoIndex;
+	} else if (fifoIndex == numOfFrames - 1){ //if index reaches last spot  in que,reset indee to zero
+		fifoIndex = 0;
+		return fifoIndex;
+	} else {
+		fifoIndex += 1;
+		return fifoIndex;
+	}
+}
+
 
 //personal debug functions
 void printAccessBitString(struct Access* access){

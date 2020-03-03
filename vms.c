@@ -426,12 +426,12 @@ void simulate(struct Access* accessHead){
 		if(trace->type == 'W')
 			trace->isDirty = 1;
 		processTrace(trace, accessHead);
-		printVMSQueue();
+		//printVMSQueue();
 		trace = trace->nextAccess;//increment to next trace
 	}
 	processTrace(trace, accessHead);
 	
-	printVMSQueue();
+	//printVMSQueue();
 	
 	diskReads = RAMMisses;
 	a = accessHead;

@@ -426,12 +426,16 @@ void simulate(struct Access* accessHead){
 		if(trace->type == 'W')
 			trace->isDirty = 1;
 		processTrace(trace, accessHead);
-		//printVMSQueue();
+		if(debugMode && replacementMethod == 'v'){
+			printVMSQueue();
+		}
 		trace = trace->nextAccess;//increment to next trace
 	}
 	processTrace(trace, accessHead);
 	
-	//printVMSQueue();
+		if(debugMode && replacementMethod == 'v'){
+			printVMSQueue();
+		}
 	
 	diskReads = RAMMisses;
 	a = accessHead;
@@ -510,7 +514,7 @@ void processTrace(struct Access* trace,struct Access* accessHead){
 					//loop through vmsQueue to find trace
 					while(a->nextAccess != NULL){
 						if(a->hexVal == trace->hexVal){
-							printf("Adding reference bit to: %x\n", a->hexVal);
+							//printf("Adding reference bit to: %x\n", a->hexVal);
 							a->referenced = 1;
 							break;
 						}
@@ -519,7 +523,7 @@ void processTrace(struct Access* trace,struct Access* accessHead){
 					if(a->hexVal == trace->hexVal){
 						a->referenced = 1;
 					}
-					printf("%x has a reference bit of: %d\n", a->hexVal, a->referenced);
+					//printf("%x has a reference bit of: %d\n", a->hexVal, a->referenced);
 
 				}
 			}
@@ -654,6 +658,7 @@ void insertPage(int pageNum, int frameNum, struct Access* trace){
 			vmsQueue->front = vmsQueue->end = a; 
 		} else {
 			// Add the new node at the end of queue and change rear 
+			a->previousAccess = vmsQueue->end;
 			vmsQueue->end->nextAccess = a; 
 			vmsQueue->end = a; 
 		}	
@@ -744,20 +749,25 @@ int vmsPageRemoval(){
 	temp = vmsQueue->front;
 	while(temp->nextAccess != NULL){
 		if(temp->referenced){
-			printf("Removing reference bits for: %x\n", temp->hexVal);
+			//printf("Removing reference bits for: %x\n", temp->hexVal);
 			temp->referenced = 0;
 		} else {
 			if(temp == vmsQueue->front){
-				printf("hit front\n");
+				//printf("hit front\n");
 				vmsQueue->front = temp->nextAccess;
 				vmsQueue->front->previousAccess = NULL;
 			} else if(temp == vmsQueue->end){
-				printf("hit end\n");
+				//printf("hit end\n");
 				vmsQueue->end = vmsQueue->end->previousAccess;
 				vmsQueue->end->nextAccess = NULL;
 			} else {
-				printf("hit mid\n");
+				//printf("hit mid\n");
 				temp->previousAccess->nextAccess = temp->nextAccess;
+				//printf("Temp->nextAccess: %x\n", temp->nextAccess->hexVal);
+								//printf("Temp->previousAccess: %x\n", temp->previousAccess->hexVal);
+
+				//printf("Temp->nextAccess->previousAccess: %x\n", temp->nextAccess->previousAccess->hexVal);
+				//printf("Temp->previousAccess: %x\n", temp->previousAccess->hexVal);
 				temp->nextAccess->previousAccess = temp->previousAccess;
 			}
 			
@@ -765,7 +775,7 @@ int vmsPageRemoval(){
 		}
 		temp = temp->nextAccess;
 	}
-			printf("Removing: %x\n", temp->hexVal);
+			//printf("Removing: %x\n", temp->hexVal);
 
     
     // If front becomes NULL, then change rear also as NULL 

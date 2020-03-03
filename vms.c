@@ -71,6 +71,7 @@ void printLRU();
 void printVMSQueue();
 
 int main(int argc, char* argv[]){
+
 	
 	struct Access* accessHead = malloc(sizeof(struct Access)); //create and allocate memory for access
 
@@ -79,7 +80,7 @@ int main(int argc, char* argv[]){
 	simulate(accessHead);
 	
 	
-	printf("\nTotal memory frames: %d\n", numOfFrames);
+	printf("Total memory frames: %d\n", numOfFrames);
 	printf("Events in trace: %d\n", eventsInTrace);
 	printf("Total disk reads: %d\n", diskReads);
 	printf("Total disk writes: %d\n", diskWrites);
@@ -427,14 +428,14 @@ void simulate(struct Access* accessHead){
 			trace->isDirty = 1;
 		processTrace(trace, accessHead);
 		if(debugMode && replacementMethod == 'v'){
-			printVMSQueue();
+			//printVMSQueue();
 		}
 		trace = trace->nextAccess;//increment to next trace
 	}
 	processTrace(trace, accessHead);
 	
 		if(debugMode && replacementMethod == 'v'){
-			printVMSQueue();
+			//printVMSQueue();
 		}
 	
 	diskReads = RAMMisses;
